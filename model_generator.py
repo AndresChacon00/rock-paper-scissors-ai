@@ -7,8 +7,8 @@ import tensorflow as tf
 from sklearn.model_selection import train_test_split
 
 EPOCHS = 50
-IMG_WIDTH = 30
-IMG_HEIGHT = 20
+IMG_WIDTH = 90
+IMG_HEIGHT = 60
 NUM_CATEGORIES = 3
 TEST_SIZE = 0.3
 
@@ -68,7 +68,7 @@ def load_data(data_dir):
 def get_model():
     model = tf.keras.Sequential([
         # Primera capa convolucional
-        tf.keras.layers.Conv2D(32, (3, 3), activation="relu", input_shape=(20, 30, 3)),
+        tf.keras.layers.Conv2D(32, (3, 3), activation="relu", input_shape=(IMG_HEIGHT, IMG_WIDTH, 3)),
         tf.keras.layers.MaxPooling2D(pool_size=(2, 2)),
 
         # Segunda capa convolucional

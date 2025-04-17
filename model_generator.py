@@ -42,6 +42,9 @@ def main():
     # Evaluate
     model.evaluate(x_test, y_test, verbose=2)
 
+    # Save model
+    model.save("rock_paper_scissors_model.h5")
+
 
 def load_data(data_dir):
     """

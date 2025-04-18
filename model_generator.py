@@ -45,6 +45,9 @@ def main():
     # Save model
     model.save("rock_paper_scissors_model.h5")
 
+    # Predecir imágenes guardadas
+    if len(sys.argv) == 3:
+        predecir_imagenes_guardadas(sys.argv[2], model)
 
 def load_data(data_dir):
     """
@@ -99,6 +102,34 @@ def get_model():
     )
 
     return model
+
+def predecir_imagenes_guardadas(folder, model):
+    """
+    Carga imágenes desde una carpeta, las procesa y realiza predicciones con el modelo entrenado.
+
+    Parámetros:
+    - folder (str): Ruta a la carpeta que contiene las imágenes.
+    - model (tf.keras.Model): Modelo entrenado.
+    """
+    print(f"Prediciendo imágenes en la carpeta: {folder}")
+    for filename in os.listdir(folder):
+        img_path = os.path.join(folder, filename)
+        img = cv2.imread(img_path)
+
+        if img is None:
+            print(f"No se pudo cargar la imagen: {filename}")
+            continue
+
+        # Procesar la imagen
+        img_resized = cv2.resize(img, (IMG_WIDTH, IMG_HEIGHT))
+        img_normalized = img_resized / 255.0
+        img_input = np.expand_dims(img_normalized, axis=0)
+
+        # Realizar la predicción
+        prediccion = model.predict(img_input, verbose=0)
+        clase = np.argmax(prediccion)
+        print(f"Imagen: {filename} -> Predicción: {CATEGORIES[clase]}")
+
 
 if __name__ == "__main__":
     main()

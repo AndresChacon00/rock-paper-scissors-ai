@@ -20,15 +20,10 @@ mp_drawing = mp.solutions.drawing_utils
 cap = cv2.VideoCapture(0)
 detector = sm.detectorManos(confDeteccion=0.9)
 
-# Variables para rastrear el movimiento
-subidas = 0  # Contador de subidas de la mano
-mano_arriba = False  # Estado de la mano (si está arriba o no)
-jugada_realizada = False # Controla si ya se realizó la prediccion
-tiempo_espera = 0
-
-
-n_juegos=3
-juego_actual=1
+# Variables para rastrear el estado del juego
+jugada_realizada = False
+tiempo_inicio = 0
+cuenta_regresiva = 3  # Tiempo de cuenta regresiva en segundos
 
 def determinarGanador(jugador, ia):
     """
@@ -137,57 +132,43 @@ while True:
     if not ret:
         break
 
-    alto, ancho, c = frame.shape
-    mitad_frame = alto // 2  # Calcular la mitad del frame
     frame = cv2.flip(frame, 1)
 
-    # Dibujar una línea en la mitad del frame
-    cv2.line(frame, (0, mitad_frame), (ancho, mitad_frame), (0, 255, 0), 2)
+    # Crear un fondo más grande (800x600) con un color sólido (negro)
+    interfaz = np.zeros((800, 600, 3), dtype=np.uint8)
 
-    # Encontrar manos
-    frame = detector.encontrarManos(frame, dibujar=False)
-    posiciones, _, _ = detector.encontrarPosicion(frame, dibujar=False)
+    # Redimensionar el frame de la cámara para que sea más pequeño (por ejemplo, 480x360)
+    frame_resized = cv2.resize(frame, (480, 360))
 
-    if posiciones:
-        # Obtener la coordenada y del punto clave de la muñeca (id=0)
-        for punto in posiciones:
-            if punto[0] == 0:  # id=0 corresponde a la muñeca
-                _, _, y = punto
-                break
+    # Calcular las coordenadas para centrar el frame en la interfaz
+    x_offset = (interfaz.shape[1] - frame_resized.shape[1]) // 2
+    y_offset = (interfaz.shape[0] - frame_resized.shape[0]) // 2
 
-        # Detectar si la mano sube más allá de la mitad del frame
-        if y < mitad_frame:  
-            if not mano_arriba:  
-                subidas += 1
-                mano_arriba = True  
-                
+    # Colocar el frame de la cámara en el centro de la interfaz
+    interfaz[y_offset:y_offset + frame_resized.shape[0], x_offset:x_offset + frame_resized.shape[1]] = frame_resized
+
+    if not jugada_realizada:
+        # Mostrar la cuenta regresiva en la interfaz
+        tiempo_restante = int(cuenta_regresiva - (time.time() - tiempo_inicio))
+        if tiempo_restante > 0:
+            cv2.putText(interfaz, f"{tiempo_restante}", (interfaz.shape[1] // 2 - 50, interfaz.shape[0] // 2 - 200),
+                        cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 255, 0), 5)
         else:
-            mano_arriba = False  
-
-        # Mostrar el número de subidas detectadas
-        if subidas <= 3:
-            cv2.putText(frame, f"{subidas}", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
-
-        if subidas == 3 and mano_arriba==False and not jugada_realizada:
-            cv2.putText(frame, "YA", (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-            
-            tiempo_espera = time.time() + 2
+            # Capturar el frame y realizar la predicción
             frame_procesado = preprocesar_frame(frame)
             cv2.imwrite("frame.png", frame_procesado)
             jugada = determinarJugada(frame_procesado, modelo)
-    
             jugada_realizada = True
+            tiempo_inicio = time.time() + 2  # Esperar 2 segundos antes de reiniciar
 
     if jugada_realizada:
-        cv2.putText(frame, f"Jugada: {CATEGORIES[jugada]}", (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-    
-    if jugada_realizada and time.time() > tiempo_espera:
-        subidas = 0
-        jugada_realizada = False
+        cv2.putText(interfaz, f"Jugada: {CATEGORIES[jugada]}", (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        if time.time() > tiempo_inicio:
+            jugada_realizada = False
+            tiempo_inicio = time.time()  # Reiniciar la cuenta regresiva
 
-    # Mostrar el frame
-    cv2.imshow("Piedra, Papel o Tijera", frame)
+    # Mostrar la interfaz completa
+    cv2.imshow("Piedra, Papel o Tijera", interfaz)
     if cv2.waitKey(1) & 0xFF == 27:  # Presiona 'Esc' para salir
         break
 

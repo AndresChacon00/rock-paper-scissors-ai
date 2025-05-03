@@ -131,54 +131,60 @@ opcion = mostrar_menu()
 if opcion == "salir":
     print("Saliendo del juego...")
     exit()
+elif opcion == "info":
+    print("Información del juego: Este es un juego de Piedra, Papel o Tijera.")
+    opcion = mostrar_menu()  # Volver al menú después de mostrar la información
 
-# Cargar modelo
-modelo = tf.keras.models.load_model("rock_paper_scissors_model.h5")
+if opcion == "jugar":
+    # Cargar modelo
+    modelo = tf.keras.models.load_model("rock_paper_scissors_model.h5")
 
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        break
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-    frame = cv2.flip(frame, 1)
+        frame = cv2.flip(frame, 1)
 
-    # Crear un fondo más grande (800x600) con un color sólido (negro)
-    interfaz = np.zeros((800, 600, 3), dtype=np.uint8)
+        # Crear un fondo más grande (800x600) con un color sólido (negro)
+        interfaz = np.zeros((800, 600, 3), dtype=np.uint8)
 
-    # Redimensionar el frame de la cámara para que sea más pequeño (por ejemplo, 480x360)
-    frame_resized = cv2.resize(frame, (480, 360))
+        # Redimensionar el frame de la cámara para que sea más pequeño (por ejemplo, 480x360)
+        frame_resized = cv2.resize(frame, (480, 360))
 
-    # Calcular las coordenadas para centrar el frame en la interfaz
-    x_offset = (interfaz.shape[1] - frame_resized.shape[1]) // 2
-    y_offset = (interfaz.shape[0] - frame_resized.shape[0]) // 2
+        # Calcular las coordenadas para centrar el frame en la interfaz
+        x_offset = (interfaz.shape[1] - frame_resized.shape[1]) // 2
+        y_offset = (interfaz.shape[0] - frame_resized.shape[0]) // 2
 
-    # Colocar el frame de la cámara en el centro de la interfaz
-    interfaz[y_offset:y_offset + frame_resized.shape[0], x_offset:x_offset + frame_resized.shape[1]] = frame_resized
+        # Colocar el frame de la cámara en el centro de la interfaz
+        interfaz[y_offset:y_offset + frame_resized.shape[0], x_offset:x_offset + frame_resized.shape[1]] = frame_resized
 
-    if not jugada_realizada:
-        # Mostrar la cuenta regresiva en la interfaz
-        tiempo_restante = int(cuenta_regresiva - (time.time() - tiempo_inicio))
-        if tiempo_restante > 0:
-            cv2.putText(interfaz, f"{tiempo_restante}", (interfaz.shape[1] // 2 - 50, interfaz.shape[0] // 2 - 200),
-                        cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 255, 0), 5)
-        else:
-            # Capturar el frame y realizar la predicción
-            frame_procesado = preprocesar_frame(frame)
-            cv2.imwrite("frame.png", frame_procesado)
-            jugada = determinarJugada(frame_procesado, modelo)
-            jugada_realizada = True
-            tiempo_inicio = time.time() + 2  # Esperar 2 segundos antes de reiniciar
+        if not jugada_realizada:
+            # Mostrar la cuenta regresiva en la interfaz
+            tiempo_restante = int(cuenta_regresiva - (time.time() - tiempo_inicio))
+            if tiempo_restante > 0:
+                cv2.putText(interfaz, f"{tiempo_restante}", (interfaz.shape[1] // 2 - 50, interfaz.shape[0] // 2 - 200),
+                            cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 255, 0), 5)
+            else:
+                # Capturar el frame y realizar la predicción
+                frame_procesado = preprocesar_frame(frame)
+                cv2.imwrite("frame.png", frame_procesado)
+                jugada = determinarJugada(frame_procesado, modelo)
+                jugada_realizada = True
+                tiempo_inicio = time.time() + 2  # Esperar 2 segundos antes de reiniciar
 
-    if jugada_realizada:
-        cv2.putText(interfaz, f"Jugada: {CATEGORIES[jugada]}", (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-        if time.time() > tiempo_inicio:
-            jugada_realizada = False
-            tiempo_inicio = time.time()  # Reiniciar la cuenta regresiva
+        if jugada_realizada:
+            cv2.putText(interfaz, f"Jugada: {CATEGORIES[jugada]}", (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            if time.time() > tiempo_inicio:
+                jugada_realizada = False
+                tiempo_inicio = time.time()  # Reiniciar la cuenta regresiva
 
-    # Mostrar la interfaz completa
-    cv2.imshow("Piedra, Papel o Tijera", interfaz)
-    if cv2.waitKey(1) & 0xFF == 27:  # Presiona 'Esc' para salir
-        break
+        # Mostrar la interfaz completa
+        cv2.imshow("Piedra, Papel o Tijera", interfaz)
+        if cv2.waitKey(1) & 0xFF == 27:  # Presiona 'Esc' para salir
+            break
+
+
 
 cap.release()
 cv2.destroyAllWindows()

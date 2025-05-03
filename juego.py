@@ -4,6 +4,7 @@ import tensorflow as tf
 import numpy as np
 import time
 import mediapipe as mp
+from menu import mostrar_menu
 
 IMG_WIDTH = 90
 IMG_HEIGHT = 60
@@ -123,6 +124,13 @@ def determinarJugada(frame, model):
 
     # Devolver la categoría correspondiente
     return clase
+
+# Mostrar el menú inicial
+opcion = mostrar_menu()
+
+if opcion == "salir":
+    print("Saliendo del juego...")
+    exit()
 
 # Cargar modelo
 modelo = tf.keras.models.load_model("rock_paper_scissors_model.h5")

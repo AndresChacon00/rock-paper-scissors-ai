@@ -27,6 +27,9 @@ joblib.dump(scaler,"scaler.pkl")
 model = tf.keras.Sequential([
     tf.keras.layers.Input(shape=(X_train.shape[1],)),  # Entrada con el número de características
     tf.keras.layers.Dense(128, activation="relu"),  # Capa oculta con 64 neuronas y activación ReLU
+    tf.keras.layers.Dropout(0.3), # Dropout
+    tf.keras.layers.Dense(128, activation="relu"),  # Capa oculta con 64 neuronas y activación ReLU
+    tf.keras.layers.Dropout(0.3), # Dropout
     tf.keras.layers.Dense(len(set(y)), activation="softmax")  # Capa de salida con activación softmax
 ])
 

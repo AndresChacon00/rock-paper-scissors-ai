@@ -1,12 +1,24 @@
 from menu import mostrar_menu
 from juego import iniciar_juego
+import pygame
+import sys
 
-opcion = mostrar_menu()
+def main():
+    pygame.init()
+    ancho, alto = 1000, 600  # Aumentar el tamaño de la pantalla
+    pantalla = pygame.display.set_mode((ancho, alto))
+    pygame.display.set_caption("Piedra, Papel o Tijera")
 
-if opcion == "jugar":
-    iniciar_juego()
-elif opcion == "info":
-    print("Información del juego: Este es un juego de Piedra, Papel o Tijera.")
-elif opcion == "salir":
-    print("Saliendo del juego...")
-    exit()
+    estado = "menu"  # Estado inicial
+
+    while True:
+        if estado == "menu":
+            estado = mostrar_menu(pantalla)
+        elif estado == "jugar":
+            estado = iniciar_juego(pantalla)
+        elif estado == "salir":
+            pygame.quit()
+            sys.exit()
+
+if __name__ == "__main__":
+    main()

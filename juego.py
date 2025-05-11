@@ -4,7 +4,8 @@ import tensorflow as tf
 import numpy as np
 import time
 import mediapipe as mp
-from menu import mostrar_menu
+import pygame
+import random
 
 IMG_WIDTH = 90
 IMG_HEIGHT = 60
@@ -14,6 +15,12 @@ CATEGORIES = [
     "piedra",
     "tijera",
 ]
+
+# Colores
+COLOR_FONDO = (153, 204, 255)  # Celeste
+COLOR_BOTON = (255, 255, 255)  # Blanco
+COLOR_TEXTO = (0, 0, 0)        # Negro
+CUADRO_TAMANO = 300
 
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
@@ -125,66 +132,105 @@ def determinarJugada(frame, model):
     # Devolver la categoría correspondiente
     return clase
 
-# Mostrar el menú inicial
-opcion = mostrar_menu()
+def iniciar_juego(pantalla):
+    """
+    Función principal para ejecutar el juego de Piedra, Papel o Tijera en la misma ventana de Pygame.
+    """
+    global cap, modelo, jugada_realizada, tiempo_inicio  # Asegurarse de que las variables globales sean accesibles
 
-if opcion == "salir":
-    print("Saliendo del juego...")
-    exit()
-elif opcion == "info":
-    print("Información del juego: Este es un juego de Piedra, Papel o Tijera.")
-    opcion = mostrar_menu()  # Volver al menú después de mostrar la información
-
-if opcion == "jugar":
     # Cargar modelo
     modelo = tf.keras.models.load_model("rock_paper_scissors_model.h5")
 
+    ancho, alto = pantalla.get_size()
+
+    # Cargar la imagen grande y dividirla en tres partes
+    imagen_grande = pygame.image.load("piedra_papel_tijera.png")  # Asegúrate de usar el nombre correcto
+    ancho_imagen = 1856  # Ancho de cada imagen individual
+    alto_imagen = 1801   # Alto de cada imagen individual
+
+    tijera = imagen_grande.subsurface((0, 0, ancho_imagen, alto_imagen))
+    piedra = imagen_grande.subsurface((ancho_imagen, 0, ancho_imagen, alto_imagen))
+    papel = imagen_grande.subsurface((ancho_imagen * 2, 0, ancho_imagen, alto_imagen))
+
+    imagenes_bot = {
+        0: papel,  # Imagen para papel
+        1: piedra,  # Imagen para piedra
+        2: tijera,  # Imagen para tijera
+    }
+
+    # Escalar las imágenes del bot para que encajen en el cuadro
+    for key in imagenes_bot:
+        imagenes_bot[key] = pygame.transform.scale(imagenes_bot[key], (CUADRO_TAMANO, CUADRO_TAMANO))
+
+
+    # Variables para la jugada del bot
+    jugada_bot = None
+
     while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return "salir"
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                return "menu"
+
         ret, frame = cap.read()
         if not ret:
             break
 
         frame = cv2.flip(frame, 1)
 
-        # Crear un fondo más grande (800x600) con un color sólido (negro)
-        interfaz = np.zeros((800, 600, 3), dtype=np.uint8)
+        # Convertir el frame de OpenCV a una superficie de Pygame
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame_surface = pygame.surfarray.make_surface(np.rot90(frame_rgb))
+        frame_surface = pygame.transform.scale(frame_surface, (CUADRO_TAMANO, CUADRO_TAMANO))  # Escalar la cámara
 
-        # Redimensionar el frame de la cámara para que sea más pequeño (por ejemplo, 480x360)
-        frame_resized = cv2.resize(frame, (480, 360))
+        # Dibujar el fondo
+        pantalla.fill(COLOR_FONDO)
 
-        # Calcular las coordenadas para centrar el frame en la interfaz
-        x_offset = (interfaz.shape[1] - frame_resized.shape[1]) // 2
-        y_offset = (interfaz.shape[0] - frame_resized.shape[0]) // 2
+        # Dibujar el cuadro del bot (izquierda)
+        pygame.draw.rect(pantalla, COLOR_BOTON, (50, alto // 2 - CUADRO_TAMANO // 2, CUADRO_TAMANO, CUADRO_TAMANO))  # Cuadro del bot
+        if jugada_bot is not None:
+            pantalla.blit(imagenes_bot[jugada_bot], (50, alto // 2 - CUADRO_TAMANO // 2))  # Imagen del bot
 
-        # Colocar el frame de la cámara en el centro de la interfaz
-        interfaz[y_offset:y_offset + frame_resized.shape[0], x_offset:x_offset + frame_resized.shape[1]] = frame_resized
+        # Dibujar el cuadro del jugador (derecha)
+        pygame.draw.rect(pantalla, COLOR_BOTON, (ancho - CUADRO_TAMANO - 50, alto // 2 - CUADRO_TAMANO // 2, CUADRO_TAMANO, CUADRO_TAMANO))  # Cuadro del jugador
+        pantalla.blit(frame_surface, (ancho - CUADRO_TAMANO - 50, alto // 2 - CUADRO_TAMANO // 2))  # Cámara del jugador
 
         if not jugada_realizada:
-            # Mostrar la cuenta regresiva en la interfaz
+            # Mostrar la cuenta regresiva en la ventana de Pygame
             tiempo_restante = int(cuenta_regresiva - (time.time() - tiempo_inicio))
             if tiempo_restante > 0:
-                cv2.putText(interfaz, f"{tiempo_restante}", (interfaz.shape[1] // 2 - 50, interfaz.shape[0] // 2 - 200),
-                            cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 255, 0), 5)
+                fuente = pygame.font.Font(None, 100)
+                texto = fuente.render(str(tiempo_restante), True, COLOR_TEXTO)
+                pantalla.blit(texto, (ancho // 2 - texto.get_width() // 2, alto // 2 - texto.get_height() // 2))
             else:
                 # Capturar el frame y realizar la predicción
                 frame_procesado = preprocesar_frame(frame)
-                cv2.imwrite("frame.png", frame_procesado)
                 jugada = determinarJugada(frame_procesado, modelo)
+
+                # Generar la jugada del bot
+                jugada_bot = random.randint(0, 2)  # 0 = papel, 1 = piedra, 2 = tijera
+
                 jugada_realizada = True
                 tiempo_inicio = time.time() + 2  # Esperar 2 segundos antes de reiniciar
 
         if jugada_realizada:
-            cv2.putText(interfaz, f"Jugada: {CATEGORIES[jugada]}", (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            # Mostrar la jugada del jugador
+            fuente = pygame.font.Font(None, 50)
+            texto_jugador = fuente.render(f"Jugador: {CATEGORIES[jugada]}", True, COLOR_TEXTO)
+            pantalla.blit(texto_jugador, (ancho - CUADRO_TAMANO - 50, alto // 2 + CUADRO_TAMANO // 2 + 10))
+
+            # Mostrar la jugada del bot
+            texto_bot = fuente.render(f"Bot: {CATEGORIES[jugada_bot]}", True, COLOR_TEXTO)
+            pantalla.blit(texto_bot, (50, alto // 2 + CUADRO_TAMANO // 2 + 10))
+
+            # Determinar el ganador
+            resultado = determinarGanador(jugada, jugada_bot)
+            texto_resultado = fuente.render(f"Resultado: {resultado}", True, COLOR_TEXTO)
+            pantalla.blit(texto_resultado, (ancho // 2 - texto_resultado.get_width() // 2, alto - 50))
+
             if time.time() > tiempo_inicio:
                 jugada_realizada = False
                 tiempo_inicio = time.time()  # Reiniciar la cuenta regresiva
 
-        # Mostrar la interfaz completa
-        cv2.imshow("Piedra, Papel o Tijera", interfaz)
-        if cv2.waitKey(1) & 0xFF == 27:  # Presiona 'Esc' para salir
-            break
-
-
-
-cap.release()
-cv2.destroyAllWindows()
+        pygame.display.flip()

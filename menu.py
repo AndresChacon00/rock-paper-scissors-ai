@@ -63,35 +63,52 @@ def mostrar_menu(pantalla):
 
         pantalla.fill(COLOR_FONDO)
 
+        # Llamar a la función de lluvia
+        lluvia_imagenes(pantalla, lluvia, imagenes, ancho, alto)
+
         # Dibujar título
         titulo = fuente_titulo.render("Piedra, Papel o Tijera", True, COLOR_TEXTO)
-        pantalla.blit(titulo, (ancho // 2 - titulo.get_width() // 2, alto // 4 - titulo.get_height() // 2))
+        pantalla.blit(titulo, (ancho // 2 - titulo.get_width() // 2, alto // 4 - titulo.get_height() // 2))        
 
-        # Generar nuevas imágenes para la lluvia
-        if random.randint(0, 200) < 1:  # Reducir la frecuencia de aparición
-            x = random.randint(0, ancho - 50)  # Posición horizontal aleatoria
-            y = -50  # Comienza fuera de la pantalla (arriba)
-
-            # Verificar que no haya otra imagen cerca en el eje x
-            distancia_minima = 100
-            posicion_valida = all(abs(x - existente[1]) > distancia_minima for existente in lluvia)
-
-            if posicion_valida:
-                img = random.choice(imagenes)  # Seleccionar una imagen aleatoria
-                lluvia.append((img, x, y))
-
-        # Dibujar y mover las imágenes de la lluvia
-        for i, (img, x, y) in enumerate(lluvia):
-            pantalla.blit(img, (x, y))
-            lluvia[i] = (img, x, y + 0.125)  # Mover más lentamente hacia abajo
-
-        # Eliminar imágenes que salieron de la pantalla
-        lluvia = [(img, x, y) for img, x, y in lluvia if y < alto]
-
-        # Dibujar botones centrados
+        # Dibujar botones con bordes
         for texto, rect in botones.items():
-            pygame.draw.rect(pantalla, COLOR_BOTON, rect)
+            borde_rect = rect.inflate(4, 4)  # Crear un borde ligeramente más grande
+            pygame.draw.rect(pantalla, (0, 0, 0), borde_rect)  # Dibujar el borde negro
+            pygame.draw.rect(pantalla, COLOR_BOTON, rect)  # Dibujar el botón blanco
             texto_render = fuente.render(texto.capitalize(), True, COLOR_TEXTO)
             pantalla.blit(texto_render, (rect.x + (rect.width - texto_render.get_width()) // 2, rect.y + 10))
 
         pygame.display.flip()
+
+def lluvia_imagenes(pantalla, lluvia, imagenes, ancho, alto):
+    """
+    Dibuja y actualiza la lluvia de imágenes en la pantalla.
+
+    Parámetros:
+    - pantalla: Superficie de Pygame donde se dibujará la lluvia.
+    - lluvia: Lista de imágenes en movimiento.
+    - imagenes: Lista de imágenes disponibles para la lluvia.
+    - ancho: Ancho de la pantalla.
+    - alto: Alto de la pantalla.
+    """
+    # Generar nuevas imágenes para la lluvia
+    if random.randint(0, 200) < 1:  # Reducir la frecuencia de aparición
+        x = random.randint(0, ancho - 50)  # Posición horizontal aleatoria
+        y = -50  # Comienza fuera de la pantalla (arriba)
+
+        # Verificar que no haya otra imagen cerca en el eje x
+        distancia_minima = 100
+        posicion_valida = all(abs(x - existente[1]) > distancia_minima for existente in lluvia)
+
+        if posicion_valida:
+            img = random.choice(imagenes)  # Seleccionar una imagen aleatoria
+            img_escalada = pygame.transform.scale(img, (100, 100))  # Escalar la imagen a 100x100
+            lluvia.append((img_escalada, x, y))
+
+    # Dibujar y mover las imágenes de la lluvia
+    for i, (img, x, y) in enumerate(lluvia):
+        pantalla.blit(img, (x, y))
+        lluvia[i] = (img, x, y + 0.125)  # Velocidad de caída
+
+    # Eliminar imágenes que salieron de la pantalla
+    lluvia[:] = [(img, x, y) for img, x, y in lluvia if y < alto]

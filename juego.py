@@ -5,7 +5,7 @@ import numpy as np
 import time
 import mediapipe as mp
 from menu import mostrar_menu
-
+import joblib
 IMG_WIDTH = 90
 IMG_HEIGHT = 60
 
@@ -18,13 +18,16 @@ CATEGORIES = [
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
 
+# Cargar el escalador
+scaler = joblib.load("scaler.pkl")
+
 cap = cv2.VideoCapture(0)
 detector = sm.detectorManos(confDeteccion=0.9)
 
 # Variables para rastrear el estado del juego
 jugada_realizada = False
 tiempo_inicio = 0
-cuenta_regresiva = 3  # Tiempo de cuenta regresiva en segundos
+cuenta_regresiva = 1  # Tiempo de cuenta regresiva en segundos
 
 def determinarGanador(jugador, ia):
     """
@@ -44,86 +47,60 @@ def determinarGanador(jugador, ia):
     else:
         return "IA gana"
 
-def preprocesar_frame(frame):
+def capturar_puntos(frame):
     """
-    Preprocesa el frame para detectar la mano y generar una imagen en blanco y negro, manteniendo la calidad.
+    Captura los puntos clave de la mano usando MediaPipe y los normaliza.
 
     Parámetros:
     - frame (numpy.ndarray): Frame capturado por la cámara.
 
     Retorna:
-    - numpy.ndarray: Frame preprocesado con la mano en blanco y negro, redimensionado al tamaño esperado por el modelo.
+    - numpy.ndarray: Vector de 63 valores (21 puntos × 3 coordenadas) normalizados o None si no se detecta una mano.
     """
-    with mp_hands.Hands(static_image_mode=False, max_num_hands=1, min_detection_confidence=0.5) as hands:
-        # Convertir el frame a RGB (MediaPipe requiere RGB)
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    results = detector.manos.process(frame_rgb)
 
-        # Procesar el frame con MediaPipe
-        results = hands.process(frame_rgb)
+    if results.multi_hand_landmarks:
+        for hand_landmarks in results.multi_hand_landmarks:
+            puntos = []
+            for landmark in hand_landmarks.landmark:
+                puntos.extend([landmark.x, landmark.y, landmark.z])
+            
+            # Normalizar los puntos clave utilizando el escalador
+            puntos = np.array(puntos, dtype=np.float32).reshape(1, -1)
+            puntos_normalizados = scaler.transform(puntos)
+            return puntos_normalizados.flatten()
+    return None
 
-        # Crear una máscara negra del mismo tamaño que el frame
-        mask = np.zeros(frame.shape[:2], dtype=np.uint8)
 
-        if results.multi_hand_landmarks:
-            for hand_landmarks in results.multi_hand_landmarks:
-                # Crear una lista de puntos (x, y) a partir de los landmarks
-                points = []
-                for landmark in hand_landmarks.landmark:
-                    x = int(landmark.x * frame.shape[1])
-                    y = int(landmark.y * frame.shape[0])
-                    points.append((x, y))
-                
-                # Extender la región hacia abajo para incluir más de la muñeca
-                wrist_extension = 50  # Ajusta este valor para incluir más o menos de la muñeca
-                points.append((points[0][0], points[0][1] + wrist_extension))  # Extender hacia abajo
-
-                # Convertir los puntos a un array de NumPy
-                points = np.array(points, dtype=np.int32)
-
-                # Dibujar un polígono que conecte todos los puntos de referencia
-                cv2.fillPoly(mask, [points], 255)  # Rellenar el área de la mano con blanco
-
-            # Dilatar la máscara para incluir más área alrededor de la mano
-            kernel = np.ones((30, 30), np.uint8)  # Ajusta el tamaño del kernel según sea necesario
-            mask = cv2.dilate(mask, kernel, iterations=1)
-
-        # Aplicar la máscara al frame original
-        hand_region = cv2.bitwise_and(frame, frame, mask=mask)
-
-        # Redimensionar al tamaño esperado por el modelo
-        resized = cv2.resize(hand_region, (IMG_WIDTH, IMG_HEIGHT))
-
-        return resized
-
-def determinarJugada(frame, model):
+def determinarJugada(puntos, model):
     """
-    Utiliza el modelo de IA para predecir si el frame muestra piedra, papel o tijera.
+    Utiliza el modelo de IA para predecir si los puntos clave corresponden a piedra, papel o tijera.
 
     Parámetros:
-    - frame (numpy.ndarray): Frame capturado por la cámara.
+    - puntos (numpy.ndarray): Vector de 63 valores (21 puntos × 3 coordenadas).
     - model (tf.keras.Model): Modelo de IA entrenado.
 
     Retorna:
     - str: Predicción ("piedra", "papel" o "tijera").
     """
-    # Preprocesar el frame
-    frame_preprocesado = preprocesar_frame(frame)
+    if puntos is None or not isinstance(puntos, np.ndarray):
+        raise ValueError("Los puntos clave no son válidos. Asegúrate de que sean un numpy.ndarray.")
 
-    # Normalizar los valores de píxeles (0-255 -> 0-1)
-    frame_normalizado = frame_preprocesado / 255.0
-
-    # Expandir dimensiones para que sea compatible con el modelo (1, IMG_HEIGHT, IMG_WIDTH, 3)
-    frame_input = np.expand_dims(frame_normalizado, axis=0)
+    # Expandir dimensiones para que sea compatible con el modelo (1, 63)
+    puntos_input = np.expand_dims(puntos, axis=0)
 
     # Realizar la predicción
-    prediccion = model.predict(frame_input, verbose=0)
+    prediccion = model.predict(puntos_input, verbose=0)
+    print(f"Puntos clave normalizados: {puntos}")
     print(f"Probabilidades: {prediccion}")
 
     # Obtener la clase con mayor probabilidad
     clase = np.argmax(prediccion)
 
     # Devolver la categoría correspondiente
-    return clase
+    return CATEGORIES[clase]
+    
 
 # Mostrar el menú inicial
 opcion = mostrar_menu()
@@ -166,15 +143,17 @@ if opcion == "jugar":
                 cv2.putText(interfaz, f"{tiempo_restante}", (interfaz.shape[1] // 2 - 50, interfaz.shape[0] // 2 - 200),
                             cv2.FONT_HERSHEY_SIMPLEX, 3, (0, 255, 0), 5)
             else:
-                # Capturar el frame y realizar la predicción
-                frame_procesado = preprocesar_frame(frame)
-                cv2.imwrite("frame.png", frame_procesado)
-                jugada = determinarJugada(frame_procesado, modelo)
-                jugada_realizada = True
-                tiempo_inicio = time.time() + 2  # Esperar 2 segundos antes de reiniciar
+                # Capturar los puntos clave y realizar la predicción
+                puntos = capturar_puntos(frame)
+                if puntos is not None and puntos.shape == (63,):  # Validar que los puntos no sean None
+                    jugada = determinarJugada(puntos, modelo)
+                    jugada_realizada = True
+                    tiempo_inicio = time.time() + 2  # Esperar 2 segundos antes de reiniciar
+                else:
+                    print("No se detectó una mano. Intenta nuevamente.")
 
         if jugada_realizada:
-            cv2.putText(interfaz, f"Jugada: {CATEGORIES[jugada]}", (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            cv2.putText(interfaz, f"Jugada: {jugada}", (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
             if time.time() > tiempo_inicio:
                 jugada_realizada = False
                 tiempo_inicio = time.time()  # Reiniciar la cuenta regresiva

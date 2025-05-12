@@ -313,7 +313,7 @@ def iniciar_juego(pantalla):
                 pantalla.blit(texto, (ancho // 2 - texto.get_width() // 2, alto // 2 - texto.get_height() // 2))
             else:
                 # Capturar el frame y realizar la predicción
-                frame_procesado = preprocesar_frame(frame)
+                frame_procesado = capturar_puntos(frame)
                 jugada = determinarJugada(frame_procesado, modelo)
 
                 # Generar la jugada del bot
@@ -336,7 +336,7 @@ def iniciar_juego(pantalla):
         if jugada_realizada:
             # Mostrar la jugada del jugador
             fuente = pygame.font.Font(None, 50)
-            texto_jugador = fuente.render(f"Jugador: {CATEGORIES[jugada]}", True, COLOR_TEXTO)
+            texto_jugador = fuente.render(f"Jugador: {jugada}", True, COLOR_TEXTO)
             pantalla.blit(texto_jugador, (ancho - CUADRO_TAMANO - 50, alto // 2 + CUADRO_TAMANO // 2 + 10))
 
             # Mostrar la jugada del bot

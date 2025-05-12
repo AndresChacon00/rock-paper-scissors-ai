@@ -4,11 +4,11 @@ import tensorflow as tf
 import numpy as np
 import time
 import mediapipe as mp
-import sys
 import pygame
 import random
 from menu import lluvia_imagenes
 import joblib
+import sys
 IMG_WIDTH = 90
 IMG_HEIGHT = 60
 
@@ -106,8 +106,7 @@ def determinarJugada(puntos, model):
     clase = np.argmax(prediccion)
 
     # Devolver la categoría correspondiente
-    return CATEGORIES[clase]
-    
+    return clase
 
 def seleccionar_modo(pantalla):
     """
@@ -313,16 +312,8 @@ def iniciar_juego(pantalla):
                 texto = fuente.render(str(tiempo_restante), True, COLOR_TEXTO)
                 pantalla.blit(texto, (ancho // 2 - texto.get_width() // 2, alto // 2 - texto.get_height() // 2))
             else:
-                # Capturar los puntos clave y realizar la predicción
-                puntos = capturar_puntos(frame)
-                if puntos is not None and puntos.shape == (63,):  # Validar que los puntos no sean None
-                    jugada = determinarJugada(puntos, modelo)
-                    jugada_realizada = True
-                    tiempo_inicio = time.time() + 2  # Esperar 2 segundos antes de reiniciar
-                else:
-                    print("No se detectó una mano. Intenta nuevamente.")
                 # Capturar el frame y realizar la predicción
-                frame_procesado = capturar_puntos(frame)
+                frame_procesado = preprocesar_frame(frame)
                 jugada = determinarJugada(frame_procesado, modelo)
 
                 # Generar la jugada del bot
@@ -345,7 +336,7 @@ def iniciar_juego(pantalla):
         if jugada_realizada:
             # Mostrar la jugada del jugador
             fuente = pygame.font.Font(None, 50)
-            texto_jugador = fuente.render(f"Jugador: {jugada}", True, COLOR_TEXTO)
+            texto_jugador = fuente.render(f"Jugador: {CATEGORIES[jugada]}", True, COLOR_TEXTO)
             pantalla.blit(texto_jugador, (ancho - CUADRO_TAMANO - 50, alto // 2 + CUADRO_TAMANO // 2 + 10))
 
             # Mostrar la jugada del bot

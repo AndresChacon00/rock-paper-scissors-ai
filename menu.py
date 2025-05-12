@@ -2,32 +2,31 @@ import pygame
 import sys
 import random
 
-def mostrar_menu():
+# Colores
+COLOR_FONDO = (153, 204, 255)  # Celeste
+COLOR_BOTON = (255, 255, 255)  # Blanco
+COLOR_TEXTO = (0, 0, 0)        # Negro
+
+def mostrar_menu(pantalla):
     """
     Muestra el menú inicial con botones, un título y una lluvia de imágenes de piedra, papel o tijera.
     """
-    # Inicializar pygame
-    pygame.init()
-
-    # Configurar la pantalla
-    ancho, alto = 800, 600
-    pantalla = pygame.display.set_mode((ancho, alto))
-    pygame.display.set_caption("Menu - Piedra, Papel o Tijera")
-
-    # Colores
-    COLOR_FONDO = (153, 204, 255)  # Celeste
-    COLOR_BOTON = (255, 255, 255)  # Blanco
-    COLOR_TEXTO = (0, 0, 0)        # Negro
+    ancho, alto = pantalla.get_size()    
 
     # Fuentes
     fuente = pygame.font.Font(None, 50)
-    fuente_titulo = pygame.font.Font(None, 80)  # Fuente más grande para el título
+    fuente_titulo = pygame.font.Font(None, 80)
 
-    # Botones
+    # Dimensiones de los botones
+    boton_ancho = 400
+    boton_alto = 50
+    espacio_entre_botones = 30
+
+    # Posiciones centradas para los botones
     botones = {
-        "jugar": pygame.Rect(200, 150, 400, 50),
-        "info": pygame.Rect(200, 250, 400, 50),
-        "salir": pygame.Rect(200, 350, 400, 50),
+        "jugar": pygame.Rect((ancho - boton_ancho) // 2, alto // 2 - boton_alto - espacio_entre_botones, boton_ancho, boton_alto),
+        "info": pygame.Rect((ancho - boton_ancho) // 2, alto // 2, boton_ancho, boton_alto),
+        "salir": pygame.Rect((ancho - boton_ancho) // 2, alto // 2 + boton_alto + espacio_entre_botones, boton_ancho, boton_alto),
     }
 
     # Cargar la imagen grande y dividirla en tres partes
@@ -35,9 +34,9 @@ def mostrar_menu():
     ancho_imagen = 1856  # Ancho de cada imagen individual
     alto_imagen = 1801   # Alto de cada imagen individual
 
-    piedra = imagen_grande.subsurface((0, 0, ancho_imagen, alto_imagen))
-    papel = imagen_grande.subsurface((ancho_imagen, 0, ancho_imagen, alto_imagen))
-    tijera = imagen_grande.subsurface((ancho_imagen * 2, 0, ancho_imagen, alto_imagen))
+    tijera = imagen_grande.subsurface((0, 0, ancho_imagen, alto_imagen))
+    piedra = imagen_grande.subsurface((ancho_imagen, 0, ancho_imagen, alto_imagen))
+    papel = imagen_grande.subsurface((ancho_imagen * 2, 0, ancho_imagen, alto_imagen))
 
     # Escalar las imágenes a un tamaño más pequeño
     piedra = pygame.transform.scale(piedra, (100, 100))
@@ -47,63 +46,69 @@ def mostrar_menu():
     # Lista de imágenes para la lluvia
     imagenes = [piedra, papel, tijera]
 
-    # Lista para rastrear las posiciones de las imágenes
+    # Lista de imágenes para la lluvia
     lluvia = []
 
-    # Estado del menú
-    en_menu = True
-
-    # Bucle principal
     while True:
-        # Manejar eventos
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            if event.type == pygame.MOUSEBUTTONDOWN and en_menu:
+                return "salir"
+            if event.type == pygame.MOUSEBUTTONDOWN:
                 if botones["jugar"].collidepoint(event.pos):
-                    en_menu = False  # Cambiar al estado del juego
                     return "jugar"
                 elif botones["info"].collidepoint(event.pos):
                     print("Información del juego: Este es un juego de Piedra, Papel o Tijera.")
                 elif botones["salir"].collidepoint(event.pos):
-                    pygame.quit()
-                    sys.exit()
+                    return "salir"
 
-        # Dibujar fondo
         pantalla.fill(COLOR_FONDO)
 
-        # Dibujar título del menú
+        # Llamar a la función de lluvia
+        lluvia_imagenes(pantalla, lluvia, imagenes, ancho, alto)
+
+        # Dibujar título
         titulo = fuente_titulo.render("Piedra, Papel o Tijera", True, COLOR_TEXTO)
-        pantalla.blit(titulo, (ancho // 2 - titulo.get_width() // 2, 50))  # Centrar el título horizontalmente
+        pantalla.blit(titulo, (ancho // 2 - titulo.get_width() // 2, alto // 4 - titulo.get_height() // 2))        
 
-        # Generar nuevas imágenes para la lluvia
-        if random.randint(0, 200) < 1:  # Reducir la frecuencia de aparición
-            x = random.randint(0, ancho - 50)  # Posición horizontal aleatoria
-            y = -50  # Comienza fuera de la pantalla (arriba)
+        # Dibujar botones con bordes
+        for texto, rect in botones.items():
+            borde_rect = rect.inflate(4, 4)  # Crear un borde ligeramente más grande
+            pygame.draw.rect(pantalla, (0, 0, 0), borde_rect)  # Dibujar el borde negro
+            pygame.draw.rect(pantalla, COLOR_BOTON, rect)  # Dibujar el botón blanco
+            texto_render = fuente.render(texto.capitalize(), True, COLOR_TEXTO)
+            pantalla.blit(texto_render, (rect.x + (rect.width - texto_render.get_width()) // 2, rect.y + 10))
 
-            # Verificar que no haya otra imagen cerca en el eje x
-            distancia_minima = 100
-            posicion_valida = all(abs(x - existente[1]) > distancia_minima for existente in lluvia)
-
-            if posicion_valida:
-                img = random.choice(imagenes)  # Seleccionar una imagen aleatoria
-                lluvia.append((img, x, y))
-
-        # Dibujar y mover las imágenes de la lluvia
-        for i, (img, x, y) in enumerate(lluvia):
-            pantalla.blit(img, (x, y))
-            lluvia[i] = (img, x, y + 0.125)  # Mover más lentamente hacia abajo
-
-        # Eliminar imágenes que salieron de la pantalla
-        lluvia = [(img, x, y) for img, x, y in lluvia if y < alto]
-
-        if en_menu:
-            # Dibujar botones
-            for texto, rect in botones.items():
-                pygame.draw.rect(pantalla, COLOR_BOTON, rect)
-                texto_render = fuente.render(texto.capitalize(), True, COLOR_TEXTO)
-                pantalla.blit(texto_render, (rect.x + 150, rect.y + 10))        
-
-        # Actualizar pantalla
         pygame.display.flip()
+
+def lluvia_imagenes(pantalla, lluvia, imagenes, ancho, alto):
+    """
+    Dibuja y actualiza la lluvia de imágenes en la pantalla.
+
+    Parámetros:
+    - pantalla: Superficie de Pygame donde se dibujará la lluvia.
+    - lluvia: Lista de imágenes en movimiento.
+    - imagenes: Lista de imágenes disponibles para la lluvia.
+    - ancho: Ancho de la pantalla.
+    - alto: Alto de la pantalla.
+    """
+    # Generar nuevas imágenes para la lluvia
+    if random.randint(0, 200) < 1:  # Reducir la frecuencia de aparición
+        x = random.randint(0, ancho - 50)  # Posición horizontal aleatoria
+        y = -50  # Comienza fuera de la pantalla (arriba)
+
+        # Verificar que no haya otra imagen cerca en el eje x
+        distancia_minima = 100
+        posicion_valida = all(abs(x - existente[1]) > distancia_minima for existente in lluvia)
+
+        if posicion_valida:
+            img = random.choice(imagenes)  # Seleccionar una imagen aleatoria
+            img_escalada = pygame.transform.scale(img, (100, 100))  # Escalar la imagen a 100x100
+            lluvia.append((img_escalada, x, y))
+
+    # Dibujar y mover las imágenes de la lluvia
+    for i, (img, x, y) in enumerate(lluvia):
+        pantalla.blit(img, (x, y))
+        lluvia[i] = (img, x, y + 0.125)  # Velocidad de caída
+
+    # Eliminar imágenes que salieron de la pantalla
+    lluvia[:] = [(img, x, y) for img, x, y in lluvia if y < alto]

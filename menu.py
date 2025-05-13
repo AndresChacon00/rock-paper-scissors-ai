@@ -57,7 +57,9 @@ def mostrar_menu(pantalla):
                 if botones["jugar"].collidepoint(event.pos):
                     return "jugar"
                 elif botones["info"].collidepoint(event.pos):
-                    print("Información del juego: Este es un juego de Piedra, Papel o Tijera.")
+                    estado = mostrar_informacion(pantalla)
+                    if estado == "salir":
+                        return "salir"
                 elif botones["salir"].collidepoint(event.pos):
                     return "salir"
 
@@ -112,3 +114,62 @@ def lluvia_imagenes(pantalla, lluvia, imagenes, ancho, alto):
 
     # Eliminar imágenes que salieron de la pantalla
     lluvia[:] = [(img, x, y) for img, x, y in lluvia if y < alto]
+
+def mostrar_informacion(pantalla):
+    """
+    Muestra una pantalla con información sobre el juego.
+    """
+    ancho, alto = pantalla.get_size()
+
+    # Fuentes
+    fuente = pygame.font.Font(None, 50)
+    fuente_titulo = pygame.font.Font(None, 80)
+
+    # Título
+    titulo = fuente_titulo.render("Información del Juego", True, COLOR_TEXTO)
+
+    # Texto de información
+    texto_lineas = [
+        "Este es un juego de Piedra, Papel o Tijera.",
+        "Reglas:",
+        "- Piedra vence a Tijera.",
+        "- Tijera vence a Papel.",
+        "- Papel vence a Piedra.",
+        "",
+        "El juego detecta tu mano por medio de la cámara.",
+        "Tiene dos modos de juego:",
+        "- 2 de 3: Gana el primero en ganar 2 rondas.",
+        "- 3 de 5: Gana el primero en ganar 3 rondas.",
+        "",
+        "¡Diviértete jugando contra la IA!",
+    ]
+
+    # Botón para regresar al menú
+    boton_volver = pygame.Rect((ancho - 200) // 2, alto - 100, 200, 50)
+
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return "salir"
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if boton_volver.collidepoint(event.pos):
+                    return "menu"
+
+        pantalla.fill(COLOR_FONDO)
+
+        # Dibujar el título
+        pantalla.blit(titulo, (ancho // 2 - titulo.get_width() // 2, 50))
+
+        # Dibujar el texto de información
+        for i, linea in enumerate(texto_lineas):
+            texto = fuente.render(linea, True, COLOR_TEXTO)
+            pantalla.blit(texto, (ancho // 2 - texto.get_width() // 2, 150 + i * 40))
+
+        # Dibujar el botón "Volver"
+        pygame.draw.rect(pantalla, (0, 0, 0), boton_volver.inflate(4, 4))  # Borde negro
+        pygame.draw.rect(pantalla, COLOR_BOTON, boton_volver)  # Botón blanco
+        texto_volver = fuente.render("Volver", True, COLOR_TEXTO)
+        pantalla.blit(texto_volver, (boton_volver.x + (boton_volver.width - texto_volver.get_width()) // 2,
+                                     boton_volver.y + (boton_volver.height - texto_volver.get_height()) // 2))
+
+        pygame.display.flip()

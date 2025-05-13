@@ -1,3 +1,8 @@
 opencv-python
 mediapipe
 tensorflow
+numpy
+pygame
+joblib
+scikit-learn
+msvc-runtime

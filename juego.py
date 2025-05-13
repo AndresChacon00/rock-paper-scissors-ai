@@ -35,6 +35,7 @@ detector = sm.detectorManos(confDeteccion=0.9)
 
 # Variables para rastrear el estado del juego
 jugada_realizada = False
+tiempo_resultado = None
 
 def determinarGanador(jugador, ia):
     """
@@ -92,7 +93,8 @@ def determinarJugada(puntos, model):
     - str: Predicción ("piedra", "papel" o "tijera").
     """
     if puntos is None or not isinstance(puntos, np.ndarray):
-        raise ValueError("Los puntos clave no son válidos. Asegúrate de que sean un numpy.ndarray.")
+        print("No se detectó una mano. Por favor, coloca tu mano correctamente.")
+        return None
 
     # Expandir dimensiones para que sea compatible con el modelo (1, 63)
     puntos_input = np.expand_dims(puntos, axis=0)
@@ -204,7 +206,7 @@ def iniciar_juego(pantalla):
     """
     Función principal para ejecutar el juego de Piedra, Papel o Tijera en la misma ventana de Pygame.
     """
-    global cap, modelo, jugada_realizada, tiempo_inicio  # Asegurarse de que las variables globales sean accesibles
+    global cap, modelo, jugada_realizada, tiempo_inicio, tiempo_resultado  # Asegurarse de que las variables globales sean accesibles
 
     # Seleccionar el modo de juego
     modo = seleccionar_modo(pantalla)
@@ -247,7 +249,7 @@ def iniciar_juego(pantalla):
     # Variable para el botón de inicio
     juego_iniciado = False
     tiempo_inicio = 0
-    cuenta_regresiva = 5  # Contador inicial de 5 segundos
+    cuenta_regresiva = 4  # Contador inicial de 5 segundos
 
     # Inicializar el botón "Empezar"
     fuente = pygame.font.Font(None, 80)
@@ -304,7 +306,17 @@ def iniciar_juego(pantalla):
             # Dibujar el botón blanco dentro del borde
             pygame.draw.rect(pantalla, COLOR_BOTON, boton_empezar.inflate(16, 16))
             pantalla.blit(texto_empezar, boton_empezar)
-        elif not jugada_realizada:
+
+            # Detectar clic en el botón "Empezar"
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    return "salir"
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if boton_empezar.collidepoint(event.pos):
+                        juego_iniciado = True
+                        tiempo_inicio = time.time()  # Iniciar el temporizador
+                        continue
+        else:
             # Mostrar la cuenta regresiva en la ventana de Pygame
             tiempo_restante = int(cuenta_regresiva - (time.time() - tiempo_inicio))
             if tiempo_restante > 0:
@@ -312,9 +324,25 @@ def iniciar_juego(pantalla):
                 texto = fuente.render(str(tiempo_restante), True, COLOR_TEXTO)
                 pantalla.blit(texto, (ancho // 2 - texto.get_width() // 2, alto // 2 - texto.get_height() // 2))
             else:
-                # Capturar el frame y realizar la predicción
-                frame_procesado = capturar_puntos(frame)
-                jugada = determinarJugada(frame_procesado, modelo)
+                while True:
+                    # Capturar el frame y realizar la predicción
+                    frame_procesado = capturar_puntos(frame)
+                    jugada = determinarJugada(frame_procesado, modelo)
+
+                    if jugada is None:
+                        # Mostrar mensaje en la pantalla indicando que no se detectó la mano
+                        fuente = pygame.font.Font(None, 50)
+                        texto_error = fuente.render("No se detectó la mano. Intenta nuevamente.", True, (255, 0, 0))
+                        pantalla.blit(texto_error, (ancho // 2 - texto_error.get_width() // 2, alto - 100))
+                        pygame.display.flip()
+
+                        # Continuar intentando capturar la mano
+                        ret, frame = cap.read()
+                        if not ret:
+                            break
+                        frame = cv2.flip(frame, 1)
+                    else:
+                        break  # Salir del bucle si se detecta una mano válida
 
                 # Generar la jugada del bot
                 jugada_bot = random.randint(0, 2)  # 0 = papel, 1 = piedra, 2 = tijera
@@ -336,7 +364,7 @@ def iniciar_juego(pantalla):
         if jugada_realizada:
             # Mostrar la jugada del jugador
             fuente = pygame.font.Font(None, 50)
-            texto_jugador = fuente.render(f"Jugador: {jugada}", True, COLOR_TEXTO)
+            texto_jugador = fuente.render(f"Jugador: {CATEGORIES[jugada]}", True, COLOR_TEXTO)
             pantalla.blit(texto_jugador, (ancho - CUADRO_TAMANO - 50, alto // 2 + CUADRO_TAMANO // 2 + 10))
 
             # Mostrar la jugada del bot
@@ -347,24 +375,30 @@ def iniciar_juego(pantalla):
             resultado = determinarGanador(jugada, jugada_bot)
             texto_resultado = fuente.render(f"Resultado: {resultado}", True, COLOR_TEXTO)
             pantalla.blit(texto_resultado, (ancho // 2 - texto_resultado.get_width() // 2, alto - 50))
-            
+
             # Mostrar el puntaje
-            fuente = pygame.font.Font(None, 50)
             texto_puntaje = fuente.render(f"Jugador: {puntaje_jugador} - Bot: {puntaje_bot}", True, COLOR_TEXTO)
             pantalla.blit(texto_puntaje, (ancho // 2 - texto_puntaje.get_width() // 2, 50))
 
             # Verificar si alguien ganó
-            if puntaje_jugador == modo // 2 + 1:
-                mostrar_pantalla_final(pantalla, "¡Ganaste!")
+            if puntaje_jugador == modo // 2 + 1 or puntaje_bot == modo // 2 + 1:
+                pygame.display.flip()  # Actualizar la pantalla para mostrar la jugada final
+                time.sleep(2)  # Esperar 2 segundos para mostrar la elección de la IA y el resultado
+
+                if puntaje_jugador == modo // 2 + 1:
+                    mostrar_pantalla_final(pantalla, "¡Ganaste!")
+                else:
+                    mostrar_pantalla_final(pantalla, "Perdiste")
                 jugada_realizada = False
-                return "menu"  # El jugador ganó
-            elif puntaje_bot == modo // 2 + 1:
-                mostrar_pantalla_final(pantalla, "Perdiste")
+                tiempo_resultado = None
+                return "menu"  # Regresar al menú después de mostrar la pantalla final
+
+            # Esperar 2 segundos antes de reiniciar
+            if tiempo_resultado is None:
+                tiempo_resultado = time.time()  # Registrar el tiempo actual
+
+            if time.time() - tiempo_resultado >= 3.8:  # Verificar si han pasado 2 segundos
                 jugada_realizada = False
-                return "menu"  # El bot ganó
-            
-            if time.time() > tiempo_inicio:
-                jugada_realizada = False
-                tiempo_inicio = time.time()  # Reiniciar la cuenta regresiva
+                tiempo_resultado = None  # Reiniciar el temporizador
 
         pygame.display.flip()
